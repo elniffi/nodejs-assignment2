@@ -1,5 +1,5 @@
+const path = require('path')
 const fs = require('fs')
-const util = require('util')
 const http = require('http')
 const https = require('https')
 
@@ -8,21 +8,29 @@ const {
 } = require('../config.json')
 
 const config = {
-  key: fs.readFileSync('./certificates/key.pem'),
-  cert: fs.readFileSync('./certificates/cert.pem')
+  key: fs.readFileSync(path.join(__dirname, '../certificates/key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, '../certificates/cert.pem'))
 }
-
-const listenForHttpTraffic = async httpServer => util.promisify(httpServer.listen)(ports.http)
-const listenForHttpsTraffic = async httpsServer => util.promisify(httpsServer.listen)(ports.https)
 
 module.exports = {
   start: async (requestHandler) => {
     const httpServer = http.createServer(requestHandler)
     const httpsServer = https.createServer(config, requestHandler)
   
-    return Promise.all([
-      listenForHttpTraffic(httpServer),
-      listenForHttpsTraffic(httpsServer)
-    ])
+    httpServer.listen(ports.http, error => {
+      if (error) {
+        console.error(`failed to listen to http traffic on ${ports.http}`, error)
+      } else {
+        console.log(`listening to http traffic on ${ports.http}`)
+      }
+    })
+
+    httpsServer.listen(ports.https, error => {
+      if (error) {
+        console.error(`failed to listen to https traffic on ${ports.https}`, error)
+      } else {
+        console.log(`listening to https traffic on ${ports.https}`)
+      }
+    })
   }
 }
