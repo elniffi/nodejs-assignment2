@@ -69,14 +69,16 @@ const requestHandler = (req, res) => {
   req.on('end', () => {
     buffer += decoder.end()
 
-    if (req.headers['content-type'] && typeof buffer === 'string' && buffer.length) {
+    if (req.headers['content-type'] === 'application/json' && typeof buffer === 'string' && buffer.length) {
       try {
         payload = JSON.parse(buffer)
       } catch (error) {
         return sendError(400)
       }
-    } else {
+    } else if (buffer) {
       payload = buffer
+    } else {
+      payload = undefined
     }
 
     req.query = query
