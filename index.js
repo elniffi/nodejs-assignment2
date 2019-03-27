@@ -1,5 +1,8 @@
 const server = require('./utils/server')
+const router = require('./utils/router')
 
-server.start((req, res) => {
-  res.end()
+router.get('/hello', (req, res) => {
+  console.log('awwh yeah!')
 })
+
+server.start(router.requestHandler)

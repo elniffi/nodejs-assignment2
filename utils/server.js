@@ -13,7 +13,7 @@ const config = {
 }
 
 module.exports = {
-  start: async (requestHandler) => {
+  start:  requestHandler => {
     const httpServer = http.createServer(requestHandler)
     const httpsServer = https.createServer(config, requestHandler)
   
