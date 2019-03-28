@@ -5,8 +5,9 @@ const extractMetaData = require('../utils/extract-meta-data')
 // middlewares
 const queryMiddleware = require('../middlewares/query')
 const payloadMiddleware = require('../middlewares/payload')
+const jsonMiddleware = require('../middlewares/json')
 
-const middlewares = [queryMiddleware, payloadMiddleware]
+const middlewares = [queryMiddleware, payloadMiddleware, jsonMiddleware]
 const routes = {}
 
 const addHandler = (method, path, handler) => {

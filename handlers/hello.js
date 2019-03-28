@@ -1,13 +1,13 @@
 module.exports = router => {
   router.get('/hello', (req, res) => {
-    res.end()
+    res.json({responder: 'GET /hello'})
   })
 
   router.post('/hello', (req, res) => {
-    res.end()
+    res.json({responder: 'POST /hello'})
   })
 
   router.delete('/hello', (req, res) => {
-    res.end()
+    res.json({responder: 'DELETE /hello'})
   })
 }
