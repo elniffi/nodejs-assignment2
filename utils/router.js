@@ -80,6 +80,8 @@ const requestHandler = async (req, res) => {
   const handler = routes[path][method]
   
   try {
+    // TODO allow handler to be array of middlewares / handlers and
+    // extend concept to allow for aborting a chain of of middlewares/ handlers via some method
     handler(req, res)
   } catch (error) {
     // TODO: Find a way to avoid sending headers multiple times if the handler did it before crashing
