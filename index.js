@@ -1,16 +1,8 @@
 const server = require('./utils/server')
 const router = require('./utils/router')
 
-router.get('/hello', (req, res) => {
-  res.end()
-})
+const helloHandler = require('./handlers/hello')
 
-router.post('/hello', (req, res) => {
-  res.end()
-})
-
-router.delete('/hello', (req, res) => {
-  res.end()
-})
+helloHandler(router)
 
 server.start(router.requestHandler)

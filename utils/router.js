@@ -1,7 +1,12 @@
-const url = require('url')
 const http = require('http')
-const StringDecoder = require('string_decoder').StringDecoder
 
+const extractMetaData = require('../utils/extract-meta-data')
+
+// middlewares
+const queryMiddleware = require('../middlewares/query')
+const payloadMiddleware = require('../middlewares/payload')
+
+const middlewares = [queryMiddleware, payloadMiddleware]
 const routes = {}
 
 const addHandler = (method, path, handler) => {
@@ -10,16 +15,6 @@ const addHandler = (method, path, handler) => {
   }
 
   routes[path][method] = handler
-}
-
-const parseMetaData = req => {
-  const parsedUrl = url.parse(req.url, true)
-
-  return {
-    method: req.method.toLowerCase(),
-    path: parsedUrl.pathname.replace(/\/+$/g, ''),
-    query: (parsedUrl.query) ? parsedUrl.query : {}
-  }
 }
 
 const sendError = (req, res, httpCode) => {
@@ -31,7 +26,7 @@ const sendError = (req, res, httpCode) => {
   * which methods are supported by the resource
   */
   if (httpCode === 405) {
-    const { path } = parseMetaData(req)
+    const { path } = extractMetaData(req)
     const allowedMethods = Object.keys(routes[path])
 
     res.setHeader('Allow', allowedMethods
@@ -44,12 +39,16 @@ const sendError = (req, res, httpCode) => {
   res.end(http.STATUS_CODES[httpCode])
 }
 
-const requestHandler = (req, res) => {
+const requestHandler = async (req, res) => {
+  /*
+  * Basic validation to make sure a handler exists
+  * for the path and method, to avoid unnecessary work
+  * for the service otherwise.
+  */
   const {
     method,
-    path,
-    query
-  } = parseMetaData(req)
+    path
+  } = extractMetaData(req)
 
   if (!routes[path]) {
     return sendError(req, res, 404)
@@ -59,37 +58,32 @@ const requestHandler = (req, res) => {
     return sendError(req, res, 405)
   }
 
+  /*
+  * Run all the middlewares in order, synchronized to avoid race conditions
+  * or strangeness by having multiple pices of code modify and interact with the 
+  * req and res object.
+  */
+  try {
+    for (let i = 0; i < middlewares.length; i++) {
+      let middlware = middlewares[i]
+      await middlware(req, res)
+    }
+  } catch (error) {
+    return sendError(req, res, 500)
+  }
+
+  /*
+  * Last we get the handler and try and run it, with a try/catch 
+  * around it just to avoid crashing the server if it fails for some reason.
+  */
   const handler = routes[path][method]
-  const decoder = new StringDecoder('utf-8')
   
-  let buffer = ''
-  let payload
-
-  req.on('data', data => buffer += decoder.write(data))
-  req.on('end', () => {
-    buffer += decoder.end()
-
-    if (req.headers['content-type'] === 'application/json' && typeof buffer === 'string' && buffer.length) {
-      try {
-        payload = JSON.parse(buffer)
-      } catch (error) {
-        return sendError(400)
-      }
-    } else if (buffer) {
-      payload = buffer
-    } else {
-      payload = undefined
-    }
-
-    req.query = query
-    req.data = payload
-
-    try {
-      handler(req, res)
-    } catch (error) {
-      console.error(error)
-    }
-  })
+  try {
+    handler(req, res)
+  } catch (error) {
+    // TODO: Find a way to avoid sending headers multiple times if the handler did it before crashing
+    return sendError(req, res, 500)
+  }
 }
 
 module.exports = {
