@@ -14,7 +14,8 @@ module.exports = req => new Promise((resolve, reject) => {
       try {
         payload = JSON.parse(buffer)
       } catch (error) {
-        reject(error) 
+        console.error(error)
+        reject(false) 
       }
     } else if (buffer) {
       payload = buffer

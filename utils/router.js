@@ -7,15 +7,19 @@ const queryMiddleware = require('../middlewares/query')
 const payloadMiddleware = require('../middlewares/payload')
 const jsonMiddleware = require('../middlewares/json')
 
-const middlewares = [queryMiddleware, payloadMiddleware, jsonMiddleware]
+const defaultMiddlewares = [queryMiddleware, payloadMiddleware, jsonMiddleware]
 const routes = {}
 
-const addHandler = (method, path, handler) => {
+const addHandlers = (method, path, handlers) => {
   if (!routes[path]) {
     routes[path] = {}
   }
 
-  routes[path][method] = handler
+  if (routes[path][method]) {
+    throw new RangeError('route handlers already set')
+  }
+
+  routes[path][method] = (Array.isArray(handlers)) ? [...defaultMiddlewares, ...handlers] : [...defaultMiddlewares, handlers]
 }
 
 const sendError = (req, res, httpCode) => {
@@ -60,40 +64,44 @@ const requestHandler = async (req, res) => {
   }
 
   /*
-  * Run all the middlewares in order, synchronized to avoid race conditions
-  * or strangeness by having multiple pices of code modify and interact with the 
-  * req and res object.
+  * Get the handlers for the specific path and method.
   */
-  try {
-    for (let i = 0; i < middlewares.length; i++) {
-      let middlware = middlewares[i]
-      await middlware(req, res)
-    }
-  } catch (error) {
-    return sendError(req, res, 500)
-  }
+  const handlers = routes[path][method]
 
-  /*
-  * Last we get the handler and try and run it, with a try/catch 
-  * around it just to avoid crashing the server if it fails for some reason.
-  */
-  const handler = routes[path][method]
-  
-  try {
-    // TODO allow handler to be array of middlewares / handlers and
-    // extend concept to allow for aborting a chain of of middlewares/ handlers via some method
-    handler(req, res)
-  } catch (error) {
-    // TODO: Find a way to avoid sending headers multiple times if the handler did it before crashing
-    return sendError(req, res, 500)
+  for (let i = 0; i < handlers.length; i++) {
+    let handler = handlers[i]
+
+    /*
+    * If a handler throws an error we need
+    * to catch that.
+    */
+    try {
+      /*
+      * A handler can either return a promise that at
+      * some point resolves or just run synchronously 
+      */
+      const runNext = await handler(req, res)
+
+      /*
+      * By resolving the promise with 'false'
+      * the handler can prevent further handlers
+      * being run.
+      */
+      if (runNext === false) {
+        break
+      }
+    } catch (error) {
+      console.error(error)
+      return sendError(req, res, 500)
+    }
   }
 }
 
 module.exports = {
   requestHandler,
-  get: (path, handler) => addHandler('get', path, handler),
-  post: (path, handler) => addHandler('post', path, handler),
-  put: (path, handler) => addHandler('put', path, handler),
-  patch: (path, handler) => addHandler('patch', path, handler),
-  delete: (path, handler) => addHandler('delete', path, handler)
+  get: (path, handler) => addHandlers('get', path, handler),
+  post: (path, handler) => addHandlers('post', path, handler),
+  put: (path, handler) => addHandlers('put', path, handler),
+  patch: (path, handler) => addHandlers('patch', path, handler),
+  delete: (path, handler) => addHandlers('delete', path, handler)
 }
